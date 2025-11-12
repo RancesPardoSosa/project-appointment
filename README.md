@@ -1,69 +1,99 @@
-<!--
-title: 'AWS Simple HTTP Endpoint example in NodeJS'
-description: 'This template demonstrates how to make a simple HTTP API with Node.js running on AWS Lambda and API Gateway using the Serverless Framework.'
-layout: Doc
-framework: v4
-platform: AWS
-language: nodeJS
-authorLink: 'https://github.com/serverless'
-authorName: 'Serverless, Inc.'
-authorAvatar: 'https://avatars1.githubusercontent.com/u/13742415?s=200&v=4'
--->
+# Project Appointment - API Endpoints
 
-# Serverless Framework Node HTTP API on AWS
+Este documento describe los endpoints disponibles en el proyecto **Project Appointment**.
 
-This template demonstrates how to make a simple HTTP API with Node.js running on AWS Lambda and API Gateway using the Serverless Framework.
+---
 
-This template does not include any kind of persistence (database). For more advanced examples, check out the [serverless/examples repository](https://github.com/serverless/examples/) which includes Typescript, Mongo, DynamoDB and other examples.
-
-## Usage
-
-### Deployment
-
-In order to deploy the example, you need to run the following command:
+## 1. Crear Cita
 
 ```
-serverless deploy
+POST /appointment
 ```
 
-After running deploy, you should see output similar to:
+**Descripción:**
+Crea una nueva cita en el sistema y la publica en SNS para su procesamiento según país.
 
-```
-Deploying "serverless-http-api" to stage "dev" (us-east-1)
-
-✔ Service deployed to stack serverless-http-api-dev (91s)
-
-endpoint: GET - https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/
-functions:
-  hello: serverless-http-api-dev-hello (1.6 kB)
-```
-
-_Note_: In current form, after deployment, your API is public and can be invoked by anyone. For production deployments, you might want to configure an authorizer. For details on how to do that, refer to [HTTP API (API Gateway V2) event docs](https://www.serverless.com/framework/docs/providers/aws/events/http-api).
-
-### Invocation
-
-After successful deployment, you can call the created application via HTTP:
-
-```
-curl https://xxxxxxx.execute-api.us-east-1.amazonaws.com/
-```
-
-Which should result in response similar to:
+**Body:**
 
 ```json
-{ "message": "Go Serverless v4! Your function executed successfully!" }
+{
+  "insuredId": "123456",
+  "scheduleId": "abc-123",
+  "countryISO": "PE"
+}
 ```
 
-### Local development
+**Respuesta Exitosa:**
 
-The easiest way to develop and test your function is to use the `dev` command:
+```json
+{
+  "id": "uuid",
+  "insuredId": "123456",
+  "scheduleId": "abc-123",
+  "countryISO": "PE",
+  "status": "pending",
+  "createdAt": "2025-11-12T17:00:00.000Z"
+}
+```
+
+---
+
+## 2. Listar Citas por Asegurado
 
 ```
-serverless dev
+GET /appointments?insuredId=123456
 ```
 
-This will start a local emulator of AWS Lambda and tunnel your requests to and from AWS Lambda, allowing you to interact with your function as if it were running in the cloud.
+**Descripción:**
+Obtiene todas las citas asociadas a un `insuredId` específico.
 
-Now you can invoke the function as before, but this time the function will be executed locally. Now you can develop your function locally, invoke it, and see the results immediately without having to re-deploy.
+**Query Parameters:**
 
-When you are done developing, don't forget to run `serverless deploy` to deploy the function to the cloud.
+- `insuredId` (obligatorio) – Código del asegurado.
+
+**Respuesta Exitosa:**
+
+```json
+[
+  {
+    "id": "uuid",
+    "insuredId": "123456",
+    "scheduleId": "abc-123",
+    "countryISO": "PE",
+    "status": "pending",
+    "createdAt": "2025-11-12T17:00:00.000Z"
+  },
+  {
+    "id": "uuid2",
+    "insuredId": "123456",
+    "scheduleId": "def-456",
+    "countryISO": "CL",
+    "status": "completed",
+    "createdAt": "2025-11-11T10:00:00.000Z"
+  }
+]
+```
+
+**Errores posibles:**
+
+- 400: `insuredId` no proporcionado.
+- 500: Error interno al obtener citas.
+
+---
+
+## 3. Confirmar Citas
+
+**Trigger:** Automático via SQS `sqs_confirmacion` (no HTTP)
+
+**Descripción:**
+Actualiza el estado de las citas a `"completed"` cuando se recibe un evento de confirmación desde EventBridge/SQS.
+
+**Nota:**
+Este endpoint no se llama directamente desde HTTP; se ejecuta como Lambda que procesa eventos.
+
+---
+
+## Notas Generales
+
+- El `status` de cada cita puede ser `"pending"` o `"completed"`.
+- Todas las citas nuevas se crean con `"pending"` y se actualizan automáticamente a `"completed"` mediante la confirmación.
