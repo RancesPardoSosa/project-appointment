@@ -4,6 +4,14 @@ Este documento describe los endpoints disponibles en el proyecto **Project Appoi
 
 ---
 
+## 🌐 URL Base de la API
+
+```
+https://rjwm92w4ya.execute-api.us-west-2.amazonaws.com
+```
+
+---
+
 ## 1. Crear Cita
 
 ```
