@@ -1,5 +1,6 @@
 import { v4 } from "uuid";
 import AWS from "aws-sdk";
+import { APIGatewayProxyEvent, SQSEvent } from "aws-lambda";
 
 const dynamoDb = new AWS.DynamoDB.DocumentClient();
 const sns = new AWS.SNS();
@@ -7,7 +8,10 @@ const sns = new AWS.SNS();
 const TABLE_NAME = process.env.DYNAMODB_TABLE!;
 const TOPIC_ARN = process.env.APPOINTMENTS_TOPIC_ARN!;
 
-export const createAppointment = async (event: any) => {
+export const createAppointment = async (event: APIGatewayProxyEvent) => {
+  if (!event.body) {
+    return { statusCode: 400, body: "No body provided" };
+  }
   const { insuredId, scheduleId, countryISO } = JSON.parse(event.body);
   const id = v4();
 
@@ -37,7 +41,8 @@ export const createAppointment = async (event: any) => {
           StringValue: countryISO,
         },
       },
-    }).promise();
+    })
+    .promise();
 
   return {
     statusCode: 200,
@@ -45,21 +50,21 @@ export const createAppointment = async (event: any) => {
   };
 };
 
-export const confirmAppointment = async (event: any) => {
+export const confirmAppointment = async (event: SQSEvent) => {
   for (const record of event.Records) {
     const body = JSON.parse(record.body);
-    const detail = body.detail
+    const detail = body.detail;
     const { id } = detail;
 
     await dynamoDb
       .update({
         TableName: TABLE_NAME,
         Key: { id },
-        UpdateExpression: "set #s = :s, updatedAt = :u",
-        ExpressionAttributeNames: { "#s": "status" },
+        UpdateExpression: "set #status = :status, updatedAt = :u",
+        ExpressionAttributeNames: { "#status": "status" },
         ExpressionAttributeValues: {
-          ":s": "completed",
-          ":u": new Date().toISOString(),
+          ":status": "completed",
+          ":updateAt": new Date().toISOString(),
         },
       })
       .promise();
@@ -68,7 +73,9 @@ export const confirmAppointment = async (event: any) => {
   return { statusCode: 200, body: "Confirmaciones procesadas" };
 };
 
-export const listAppointmentsByInsured = async (event: any) => {
+export const listAppointmentsByInsured = async (
+  event: APIGatewayProxyEvent,
+) => {
   const insuredId = event.queryStringParameters?.insuredId;
 
   if (!insuredId) {

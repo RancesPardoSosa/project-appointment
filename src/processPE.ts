@@ -1,5 +1,6 @@
-import AWS from 'aws-sdk';
-import mysql from 'mysql2/promise';
+import { SQSEvent } from "aws-lambda";
+import AWS from "aws-sdk";
+import mysql from "mysql2/promise";
 
 const eventBridge = new AWS.EventBridge();
 
@@ -9,7 +10,7 @@ const RDS_PASS = process.env.RDS_PASS_PE!;
 const RDS_DB = process.env.RDS_DB_PE!;
 const EVENT_BUS_NAME = process.env.EVENT_BUS_NAME!;
 
-export const handler = async (event: any) => {
+export const handler = async (event: SQSEvent) => {
   const connection = await mysql.createConnection({
     host: RDS_HOST,
     user: RDS_USER,
@@ -21,24 +22,30 @@ export const handler = async (event: any) => {
     for (const record of event.Records) {
       const body = JSON.parse(record.body);
       const appointment = JSON.parse(body.Message);
-      console.log('Procesando cita de Peru:', appointment.id);
+      console.log("Procesando cita de Peru:", appointment.id);
 
       await connection.execute(
-        'INSERT INTO appointments_pe (id, insuredId, scheduleId, countryISO, status) VALUES (?, ?, ?, ?, ?)',
-        [appointment.id, appointment.insuredId, appointment.scheduleId, appointment.countryISO, 'completed']
+        "INSERT INTO appointments_pe (id, insuredId, scheduleId, countryISO, status) VALUES (?, ?, ?, ?, ?)",
+        [
+          appointment.id,
+          appointment.insuredId,
+          appointment.scheduleId,
+          appointment.countryISO,
+          "completed",
+        ],
       );
 
       await eventBridge
         .putEvents({
           Entries: [
             {
-              Source: 'appointments.service',
-              DetailType: 'AppointmentConfirmation',
+              Source: "appointments.service",
+              DetailType: "AppointmentConfirmation",
               EventBusName: EVENT_BUS_NAME,
               Detail: JSON.stringify({
                 id: appointment.id,
                 countryISO: appointment.countryISO,
-                status: 'completed',
+                status: "completed",
               }),
             },
           ],
@@ -46,7 +53,7 @@ export const handler = async (event: any) => {
         .promise();
     }
   } catch (error) {
-    console.error('Error en processPE:', error);
+    console.error("Error en processPE:", error);
   } finally {
     await connection.end();
   }
