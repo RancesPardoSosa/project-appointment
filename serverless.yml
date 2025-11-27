@@ -37,35 +37,35 @@ plugins:
 
 functions:
   createAppointment:
-    handler: src/appointment.createAppointment
+    handler: src/handlers/handler.ScheduleAppointment
     events:
       - httpApi:
           path: /appointment
           method: post
 
   listAppointmentsByInsured:
-    handler: src/appointment.listAppointmentsByInsured
+    handler: src/handlers/handler.ListAppointmentsByInsuredId
     events:
       - httpApi:
           path: /appointments
           method: get
 
   processPE:
-    handler: src/processPE.handler
+    handler: src/handlers/handler.AppointmentPEConsumer
     events:
       - sqs:
           arn:
             Fn::GetAtt: [SQSPE, Arn]
 
   processCL:
-    handler: src/processCL.handler
+    handler: src/handlers/handler.AppointmentCLConsumer
     events:
       - sqs:
           arn:
             Fn::GetAtt: [SQSCL, Arn]
 
   confirmAppointment:
-    handler: src/appointment.confirmAppointment
+    handler: src/handlers/handler.ConfirmAppointmentConsumer
     events:
       - sqs:
           arn:
@@ -77,6 +77,7 @@ resources:
       Type: AWS::DynamoDB::Table
       Properties:
         TableName: appointments-table
+        BillingMode: PAY_PER_REQUEST
         AttributeDefinitions:
           - AttributeName: id
             AttributeType: S
@@ -85,7 +86,6 @@ resources:
         KeySchema:
           - AttributeName: id
             KeyType: HASH
-        BillingMode: PAY_PER_REQUEST
         GlobalSecondaryIndexes:
           - IndexName: InsuredIndex
             KeySchema:
